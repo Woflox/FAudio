@@ -66,9 +66,17 @@ static inline float FACT_INTERNAL_CalculateAmplitudeRatio(float decibel)
 	return (float) FAudio_pow(10.0, decibel / 2000.0);
 }
 
-float FACT_INTERNAL_CalculateFilterFrequency(float desiredFrequency, uint32_t sampleRate)
+static inline float FACT_INTERNAL_CalculateFilterFrequency(float desiredFrequency, uint32_t sampleRate)
 {
-	return FAudio_min(2 * sin(F3DAUDIO_PI * FAudio_min(desiredFrequency / sampleRate, 0.5f)), 1.0f);
+	/* This is needed to convert linear frequencies to the value FAudio_INTERNAL_FilterVoice expects,
+	 * in order for it to actually filter at the correct frequency.
+	 * The formula is (2 * sin(pi * (desired filter cutoff frequency) / sampleRate))
+	 * but it behaves badly as the filter frequency gets too high as a fraction of the sample rate,
+	 * hence the mins. -@Woflox
+	 */
+	return FAudio_min(
+		2 * sin(F3DAUDIO_PI * FAudio_min(desiredFrequency / sampleRate, 0.5f)), 
+		1.0f);
 }
 
 static inline void FACT_INTERNAL_ReadFile(
@@ -1100,7 +1108,7 @@ void FACT_INTERNAL_UpdateRPCs(
 			else if (rpc->parameter == RPC_PARAMETER_FILTERFREQUENCY)
 			{
 				/* Yes, just overwrite... */
-				float sampleRate = engine->audio->master->master.inputSampleRate;
+				const uint32_t sampleRate = engine->audio->master->master.inputSampleRate;
 				data->rpcFilterFreq = FACT_INTERNAL_CalculateFilterFrequency(rpcResult, sampleRate);
 			}
 			else if (rpc->parameter == RPC_PARAMETER_FILTERQFACTOR)
